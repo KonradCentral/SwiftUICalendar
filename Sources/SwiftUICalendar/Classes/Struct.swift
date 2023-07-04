@@ -41,89 +41,215 @@ public enum HeaderSize {
     case fixHeight(CGFloat)
 }
 
-public struct YearMonth: Equatable {
-    public let year: Int
-    public let month: Int
+public protocol Interval {
+    var year: Int { get set }
+    var focus: Int { get set }
+    var dateComponents: DateComponents { get }
+    var monthShortString: String { get }
     
-    public init(year: Int, month: Int) {
-        self.year = year
-        self.month = month
+    func shifted(by: Int) -> Interval
+    func diffInterval(value: Interval) -> Int
+    func cellToDate(_ cellIndex: Int) -> Date/*YearMonthDay*/
+    
+    init(year: Int, focus: Int)
+}
+extension Interval {
+    public static func ==(lhs: Self, rhs: Self) -> Bool {
+        return Calendar.current.isDate(
+            Calendar.current.date(from: lhs.dateComponents)!,
+            equalTo: Calendar.current.date(from: rhs.dateComponents)!,
+            toGranularity: .day
+        )
     }
     
-    public static var current: YearMonth {
+    public static var currentWeek: Interval {
         get {
             let today = Date()
-            return YearMonth(year: Calendar.current.component(.year, from: today), month: Calendar.current.component(.month, from: today))
+            return WeekInterval(
+                year: Calendar.current.component(.year, from: today),
+                focus: Calendar.current.component(.weekOfYear, from: today)
+            )
         }
     }
     
-    public static func ==(lhs: Self, rhs: Self) -> Bool {
-        return lhs.year == rhs.year && lhs.month == rhs.month
+}
+public struct MonthInterval: Interval {
+    public var year: Int
+    public var focus: Int
+    public var dateComponents: DateComponents {
+        get {
+            var components = DateComponents()
+            components.year = year
+            components.month = focus
+            components.day = 1
+            
+            return components
+        }
+    }
+    
+    public init() {
+        let today = Date()
+        self.init(
+            year: Calendar.current.component(.year, from: today),
+            focus: Calendar.current.component(.month, from: today)
+        )
+    }
+    
+    public init(year: Int, focus: Int) {
+        self.year = year
+        self.focus = focus
     }
     
     public var monthShortString: String {
         get {
-            var components = toDateComponents()
-            components.day = 1
-            components.hour = 0
-            components.minute = 0
-            components.second = 0
             let formatter = DateFormatter()
             formatter.dateFormat = "MMM"
-            return formatter.string(from: Calendar.current.date(from: components)!)
+            
+            return formatter.string(from: Calendar.current.date(from: dateComponents)!)
         }
     }
     
-    public func addMonth(value: Int) -> YearMonth {
+    public func shifted(by: Int) -> Interval {
         let gregorianCalendar = NSCalendar(calendarIdentifier: .gregorian)!
-        let toDate = self.toDateComponents()
+        var toAdd = DateComponents()
+        toAdd.month = by
 
-        var components = DateComponents()
-        components.month = value
-
-        let addedDate = Calendar.current.date(byAdding: components, to: gregorianCalendar.date(from: toDate)!)!
-        let ret = YearMonth(year: Calendar.current.component(.year, from: addedDate), month: Calendar.current.component(.month, from: addedDate))
-        return ret
+        let addedDate = Calendar.current.date(byAdding: toAdd, to: gregorianCalendar.date(from: dateComponents)!)!
+        
+        return MonthInterval(
+            year: Calendar.current.component(.year, from: addedDate),
+            focus: Calendar.current.component(.month, from: addedDate)
+        )
     }
     
-    public func diffMonth(value: YearMonth) -> Int {
-        var origin = self.toDateComponents()
-        origin.day = 1
+    public func diffInterval(value: Interval) -> Int {
+        var origin = self.dateComponents
         origin.hour = 0
         origin.minute = 0
         origin.second = 0
-        var new = value.toDateComponents()
-        new.day = 1
+        var new = value.dateComponents
         new.hour = 0
         new.minute = 0
         new.second = 0
-        return Calendar.current.dateComponents([.month], from: Calendar.current.date(from: origin)!, to: Calendar.current.date(from: new)!).month!
+        
+        return Calendar.current.dateComponents(
+            [.month],
+            from: Calendar.current.date(from: origin)!,
+            to: Calendar.current.date(from: new)!
+        ).month!
     }
-    
-    public func toDateComponents() -> DateComponents {
-        var components = DateComponents()
-        components.year = self.year
-        components.month = self.month
-        return components
-    }
-    
-    internal func cellToDate(_ cellIndex: Int) -> YearMonthDay {
+    public func cellToDate(_ cellIndex: Int) -> /*YearMonthDay*/ Date {
         let gregorianCalendar = NSCalendar(calendarIdentifier: .gregorian)!
-        var toDateComponent = DateComponents()
-        toDateComponent.year = self.year
-        toDateComponent.month = self.month
-        toDateComponent.day = 1
-        let toDate = gregorianCalendar.date(from: toDateComponent)!
-        let weekday = Calendar.current.component(.weekday, from: toDate) // 1Sun, 2Mon, 3Tue, 4Wed, 5Thu, 6Fri, 7Sat
+        
+        let toDate = gregorianCalendar.date(from: dateComponents)!
+        let weekday = gregorianCalendar.component(.weekday, from: toDate) // 1Sun, 2Mon, 3Tue, 4Wed, 5Thu, 6Fri, 7Sat
         var components = DateComponents()
-        components.day = cellIndex - weekday + 1
-        let addedDate = Calendar.current.date(byAdding: components, to: toDate)!
-        let year = Calendar.current.component(.year, from: addedDate)
-        let month = Calendar.current.component(.month, from: addedDate)
-        let day = Calendar.current.component(.day, from: addedDate)
-        let isFocusYaerMonth = year == self.year && month == self.month
-        let ret = YearMonthDay(year: year, month: month, day: day, isFocusYearMonth: isFocusYaerMonth)
-        return ret
+        components.day = cellIndex + 1 - weekday
+        let addedDate = gregorianCalendar.date(byAdding: components, to: toDate)!
+        
+        return addedDate
+        /*
+        let year = gregorianCalendar.component(.year, from: addedDate)
+        let month = gregorianCalendar.component(.month, from: addedDate)
+        let day = gregorianCalendar.component(.day, from: addedDate)
+        
+        
+        let isFocusYaerMonth: Bool
+        isFocusYaerMonth = year == dateComponents.year && month == dateComponents.month
+        
+        return YearMonthDay(year: year, month: month, day: day, isFocusYearMonth: isFocusYaerMonth)
+        */
+    }
+}
+public struct WeekInterval: Interval {
+    public var year: Int
+    public var focus: Int
+    public var dateComponents: DateComponents {
+        get {
+            var components = DateComponents()
+            components.year = self.year
+            components.weekOfYear = focus
+            components.weekday = 1
+            
+            return components
+        }
+    }
+    public var monthShortString: String {
+        get {
+            let formatter = DateFormatter()
+            formatter.dateFormat = "W MMM"
+            
+            var buffer = formatter.string(from: Calendar.current.date(from: dateComponents)!)
+            buffer = "Wk. #\(buffer)"
+            
+            return buffer
+        }
+    }
+    
+    public init() {
+        let today = Date()
+        self.init(
+            year: Calendar.current.component(.year, from: today),
+            focus: Calendar.current.component(.weekOfYear, from: today)
+        )
+    }
+    
+    public init(year: Int, focus: Int) {
+        self.year = year
+        self.focus = focus
+    }
+    
+    public func shifted(by: Int) -> Interval {
+        let gregorianCalendar = NSCalendar(calendarIdentifier: .gregorian)!
+        var toAdd = DateComponents()
+        toAdd.weekOfYear = by
+
+        let addedDate = Calendar.current.date(byAdding: toAdd, to: gregorianCalendar.date(from: dateComponents)!)!
+        
+        return WeekInterval(
+            year: Calendar.current.component(.year, from: addedDate),
+            focus: Calendar.current.component(.weekOfYear, from: addedDate)
+        )
+    }
+    
+    public func diffInterval(value: Interval) -> Int {
+        var origin = self.dateComponents
+        origin.hour = 0
+        origin.minute = 0
+        origin.second = 0
+        var new = value.dateComponents
+        new.hour = 0
+        new.minute = 0
+        new.second = 0
+        
+        return Calendar.current.dateComponents(
+            [.weekOfYear],
+            from: Calendar.current.date(from: origin)!,
+            to: Calendar.current.date(from: new)!
+        ).weekOfYear!
+    }
+    
+    public func cellToDate(_ cellIndex: Int) -> /*YearMonthDay*/ Date {
+        let gregorianCalendar = NSCalendar(calendarIdentifier: .gregorian)!
+        
+        let toDate = gregorianCalendar.date(from: dateComponents)!
+        let weekday = gregorianCalendar.component(.weekday, from: toDate) // 1Sun, 2Mon, 3Tue, 4Wed, 5Thu, 6Fri, 7Sat
+        var components = DateComponents()
+        components.day = cellIndex + 1 - weekday
+        let addedDate = gregorianCalendar.date(byAdding: components, to: toDate)!
+        
+        return addedDate
+        /*
+        let year = gregorianCalendar.component(.year, from: addedDate)
+        let month = gregorianCalendar.component(.month, from: addedDate)
+        let day = gregorianCalendar.component(.day, from: addedDate)
+        
+        
+        let isFocusYearMonth: Bool
+        isFocusYearMonth = year == year && gregorianCalendar.component(.weekOfYear, from: addedDate) == dateComponents.weekOfYear
+        
+        return YearMonthDay(year: year, month: month, day: day, isFocusYearMonth: isFocusYaerMonth)
+        */
     }
 }
 
@@ -182,9 +308,9 @@ public struct YearMonthDay: Equatable, Hashable {
     
     public func toDateComponents() -> DateComponents {
         var components = DateComponents()
-        components.year = self.year
+        components.year  = self.year
         components.month = self.month
-        components.day = self.day
+        components.day   = self.day
         return components
     }
     

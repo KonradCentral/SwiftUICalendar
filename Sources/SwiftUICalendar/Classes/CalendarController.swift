@@ -9,25 +9,39 @@ import SwiftUI
 import Combine
 
 public class CalendarController: ObservableObject {
-    @Published public var yearMonth: YearMonth
+    @Published public var interval: Interval
     @Published public var isLocked: Bool
     @Published internal var position: Int = Global.CENTER_PAGE
-    @Published internal var internalYearMonth: YearMonth
+    @Published public var viewMode: ViewMode
     
     internal let orientation: Orientation
     internal let columnCount = 7
-    internal let rowCount = 6
+    internal var rowCount: Int {
+        get {
+            viewMode == .month ? 6 : 1
+        }
+    }
     internal let max: Int = Global.MAX_PAGE
     internal let center: Int = Global.CENTER_PAGE
     internal let scrollDetector: CurrentValueSubject<CGFloat, Never>
     internal var cancellables = Set<AnyCancellable>()
     
-    public init(_ yearMonth: YearMonth = .current, orientation: Orientation = .horizontal, isLocked: Bool = false) {
+    public enum ViewMode: Int {
+        case week = 1
+        case month = 6
+    }
+    
+    public init(_ viewMode: ViewMode = .month, orientation: Orientation = .horizontal, isLocked: Bool = false) {
         let detector = CurrentValueSubject<CGFloat, Never>(0)
         
+        self.viewMode = viewMode
+        switch viewMode {
+        case .month:
+            self.interval = MonthInterval()
+        case .week:
+            self.interval = WeekInterval()
+        }
         self.scrollDetector = detector
-        self.internalYearMonth = yearMonth
-        self.yearMonth = yearMonth
         self.orientation = orientation
         self.isLocked = isLocked
         
@@ -36,9 +50,8 @@ public class CalendarController: ObservableObject {
             .dropFirst()
             .sink { [weak self] value in
                 if let self = self {
-                    let move = self.position - self.center
-                    self.internalYearMonth = self.internalYearMonth.addMonth(value: move)
-                    self.yearMonth = self.internalYearMonth
+                    let step = self.position - self.center
+                    self.interval = self.interval.shifted(by: step)
                     self.position = self.center
                     self.objectWillChange.send()
                 }
@@ -46,30 +59,32 @@ public class CalendarController: ObservableObject {
             .store(in: &cancellables)
     }
     
-    public func setYearMonth(year: Int, month: Int) {
-        self.setYearMonth(YearMonth(year: year, month: month))
+    public func setViewMode(_ viewMode: ViewMode) {
+        self.viewMode = viewMode
+        
+        switch viewMode {
+        case .month:
+            self.interval = MonthInterval()
+        case .week:
+            self.interval = WeekInterval()
+        }
     }
     
-    public func setYearMonth(_ yearMonth: YearMonth) {
-        self.yearMonth = yearMonth
-        self.internalYearMonth = yearMonth
+    public func setInterval(_ interval: Interval) {
+        self.interval = interval
         self.position = self.center
         self.objectWillChange.send()
     }
     
-    public func scrollTo(year: Int, month: Int, isAnimate: Bool = true) {
-        self.scrollTo(YearMonth(year: year, month: month), isAnimate: isAnimate)
-    }
-    
-    public func scrollTo(_ yearMonth: YearMonth, isAnimate: Bool = true) {
+    public func scrollTo(_ interval: Interval, isAnimate: Bool = true) {
         if isAnimate {
-            var diff = self.position - yearMonth.diffMonth(value: self.yearMonth)
+            var diff = self.position - interval.diffInterval(value: self.interval)
             if diff < 0 {
-                self.internalYearMonth = yearMonth.addMonth(value: self.center)
+                self.interval = interval.shifted(by: self.center)
                 diff = 0
                 // 4 * 12 + 2 50
             } else if self.max <= diff {
-                self.internalYearMonth = yearMonth.addMonth(value: -self.center + 1)
+                self.interval = interval.shifted(by: -self.center + 1)
                 diff = self.max - 1
             }
             self.objectWillChange.send()
@@ -80,8 +95,7 @@ public class CalendarController: ObservableObject {
                 }
             }
         } else {
-            self.internalYearMonth = yearMonth
-            self.yearMonth = yearMonth
+            self.interval = interval
             self.objectWillChange.send()
         }
     }

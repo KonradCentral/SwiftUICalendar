@@ -11,56 +11,68 @@ import Combine
 public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
     private var gridItem: [GridItem] = Array(repeating: .init(.flexible(), spacing: 0), count: 7) // columnCount
-    private let component: (YearMonthDay) -> CalendarCell
+    private let component: (Date, Bool/*YearMonthDay*/) -> CalendarCell
     private let header: (Week) -> HeaderCell?
     private var headerSize: HeaderSize
     @ObservedObject private var controller: CalendarController
     private let isHasHeader: Bool
+    private let formatter = DateFormatter()
     
     public init(
         _ controller: CalendarController = CalendarController(),
-        @ViewBuilder component: @escaping (YearMonthDay) -> CalendarCell
+        @ViewBuilder component: @escaping (Date, Bool/*YearMonthDay*/) -> CalendarCell
     ) where HeaderCell == EmptyView {
         self.controller = controller
         self.header = { _ in nil }
         self.component = component
         self.isHasHeader = false
         self.headerSize = .zero
+        
+        formatter.dateFormat = "dd"
     }
     
     public init(
         _ controller: CalendarController = CalendarController(),
         headerSize: HeaderSize = .fixHeight(40),
         @ViewBuilder header: @escaping (Week) -> HeaderCell,
-        @ViewBuilder component: @escaping (YearMonthDay) -> CalendarCell
+        @ViewBuilder component: @escaping (Date, Bool/*YearMonthDay*/) -> CalendarCell
     ) {
         self.controller = controller
         self.header = header
         self.component = component
         self.isHasHeader = true
         self.headerSize = headerSize
+        
+        formatter.dateFormat = "dd"
+    }
+    
+    public func isCurrentMonth(_ date: Date) -> Bool {
+        Calendar.current.component(.month, from: date) == Calendar.current.component(.month, from: Date())
     }
     
     public var body: some View {
         GeometryReader { proxy in
-            InfinitePagerView(controller, orientation: controller.orientation) { yearMonth, i in
+            InfinitePagerView(controller, orientation: controller.orientation) { yearMonthDay, i in
                 LazyVGrid(columns: gridItem, alignment: .center, spacing: 0) {
                     ForEach(0..<(controller.columnCount * (controller.rowCount + (isHasHeader ? 1 : 0))), id: \.self) { j in
                         GeometryReader { geometry in
                             if isHasHeader && j < controller.columnCount {
                                 header(Week.allCases[j])
                             } else {
-                                let date = yearMonth.cellToDate(j - (isHasHeader ? 7 : 0))
-                                self.component(date)
+                                let date = controller.interval.cellToDate(j - (isHasHeader ? 7 : 0))
+                                self.component(date, isCurrentMonth(date))
+                                    .frame(height: calculateCellHeight(j, geometry: proxy))
                             }
                         }
                         .frame(height: calculateCellHeight(j, geometry: proxy))
                     }
                 }
-                .frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
+                //.frame(width: proxy.size.width, height: proxy.size.height, alignment: .center)
             }
         }
     }
+    
+    
     
     func calculateCellHeight(_ index: Int, geometry: GeometryProxy) -> CGFloat {
         if !isHasHeader {
@@ -87,13 +99,13 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
 
 struct CalendarView_Previews: PreviewProvider {
     static var previews: some View {
-        CalendarView(CalendarController()) { date in
+        CalendarView(CalendarController()) { date, isFocusMonth in
             GeometryReader { geometry in
-                Text("\(String(date.year))/\(date.month)/\(date.day)")
+                Text("\(Calendar.current.component(.year, from: date))/\(Calendar.current.component(.month, from: date))/\(Calendar.current.component(.day, from: date))")
                     .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                     .border(.black, width: 1)
                     .font(.system(size: 8))
-                    .opacity(date.isFocusYearMonth == true ? 1 : 0.6)
+                    .opacity(isFocusMonth ? 1 : 0.6)
             }
         }
     }

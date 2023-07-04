@@ -8,7 +8,7 @@
 import Foundation
 import SwiftUI
 
-class Global {
+class Global { //TODO: Make the calendar truly infinite by either reassigning 'yearMonth', or loading TabView pages dinamically
     static let MAX_PAGE = 100
-    static let CENTER_PAGE = 100 / 2
+    static let CENTER_PAGE = MAX_PAGE / 2
 }
