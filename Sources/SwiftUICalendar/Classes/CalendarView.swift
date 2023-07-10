@@ -11,7 +11,7 @@ import Combine
 public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
     private var gridItem: [GridItem] = Array(repeating: .init(.flexible(), spacing: 0), count: 7) // columnCount
-    private let component: (Date, Bool/*YearMonthDay*/) -> CalendarCell
+    private let content: (Date, Bool) -> CalendarCell
     private let header: (Week) -> HeaderCell?
     private var headerSize: HeaderSize
     @ObservedObject private var controller: CalendarController
@@ -20,11 +20,11 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
     public init(
         _ controller: CalendarController = CalendarController(),
-        @ViewBuilder component: @escaping (Date, Bool/*YearMonthDay*/) -> CalendarCell
+        @ViewBuilder content: @escaping (Date, Bool) -> CalendarCell
     ) where HeaderCell == EmptyView {
         self.controller = controller
         self.header = { _ in nil }
-        self.component = component
+        self.content = content
         self.isHasHeader = false
         self.headerSize = .zero
         
@@ -35,11 +35,11 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
         _ controller: CalendarController = CalendarController(),
         headerSize: HeaderSize = .fixHeight(40),
         @ViewBuilder header: @escaping (Week) -> HeaderCell,
-        @ViewBuilder component: @escaping (Date, Bool/*YearMonthDay*/) -> CalendarCell
+        @ViewBuilder content: @escaping (Date, Bool) -> CalendarCell
     ) {
         self.controller = controller
         self.header = header
-        self.component = component
+        self.content = content
         self.isHasHeader = true
         self.headerSize = headerSize
         
@@ -52,15 +52,15 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
     public var body: some View {
         GeometryReader { proxy in
-            InfinitePagerView(controller, orientation: controller.orientation) { yearMonthDay, i in
+            InfinitePagerView(controller, orientation: controller.orientation) { date, i in
                 LazyVGrid(columns: gridItem, alignment: .center, spacing: 0) {
                     ForEach(0..<(controller.columnCount * (controller.rowCount + (isHasHeader ? 1 : 0))), id: \.self) { j in
-                        GeometryReader { geometry in
+                        GeometryReader { _ in
                             if isHasHeader && j < controller.columnCount {
                                 header(Week.allCases[j])
                             } else {
-                                let date = controller.interval.cellToDate(j - (isHasHeader ? 7 : 0))
-                                self.component(date, isCurrentMonth(date))
+                                let date = cellToDate(j - (isHasHeader ? 7 : 0))
+                                self.content(date, isCurrentMonth(date))
                                     .frame(height: calculateCellHeight(j, geometry: proxy))
                             }
                         }
@@ -72,7 +72,17 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
         }
     }
     
-    
+    func cellToDate(_ cellIndex: Int) -> Date {
+        let gregorian = Calendar(identifier: .gregorian)
+        
+        let toDate = controller.date
+        let weekday = gregorian.component(.weekday, from: toDate) // 1Sun, 2Mon, 3Tue, 4Wed, 5Thu, 6Fri, 7Sat
+        var components = DateComponents()
+        components.day = cellIndex + 1 - weekday
+        let addedDate = gregorian.date(byAdding: components, to: toDate)!
+        
+        return addedDate
+    }
     
     func calculateCellHeight(_ index: Int, geometry: GeometryProxy) -> CGFloat {
         if !isHasHeader {
@@ -100,8 +110,9 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
 struct CalendarView_Previews: PreviewProvider {
     static var previews: some View {
         CalendarView(CalendarController()) { date, isFocusMonth in
+            let gregorian = Calendar(identifier: .gregorian)
             GeometryReader { geometry in
-                Text("\(Calendar.current.component(.year, from: date))/\(Calendar.current.component(.month, from: date))/\(Calendar.current.component(.day, from: date))")
+                Text("\(gregorian.component(.year, from: date))/\(gregorian.component(.month, from: date))/\(gregorian.component(.day, from: date))")
                     .frame(width: geometry.size.width, height: geometry.size.height, alignment: .topLeading)
                     .border(.black, width: 1)
                     .font(.system(size: 8))

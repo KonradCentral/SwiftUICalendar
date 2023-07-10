@@ -10,12 +10,12 @@ import SwiftUI
 import Combine
 
 internal struct InfinitePagerView<Content: View>: View {
-    private let content: (Interval, Int) -> Content
+    private let content: (Date, Int) -> Content
     private let flippingAngle: Angle = Angle(degrees: 0)
     @ObservedObject private var controller: CalendarController
     //private var _onMoveCenter: ((Int) -> Void)? = nil
     
-    init(_ controller: CalendarController, orientation: Orientation, @ViewBuilder content: @escaping (Interval, Int) -> Content) {
+    init(_ controller: CalendarController, orientation: Orientation, @ViewBuilder content: @escaping (Date, Int) -> Content) {
         self.controller = controller
         self.content = content
     }
@@ -23,8 +23,8 @@ internal struct InfinitePagerView<Content: View>: View {
     var body: some View {
         drawTabView {// geometry in
             ForEach(0..<controller.max, id: \.self) { i in
-                let yearInterval = controller.interval.shifted(by: i - Global.CENTER_PAGE)
-                self.content(yearInterval, i)
+                let date = controller.offsetedFocus(by: i - Global.CENTER_PAGE)
+                self.content(date, i)
                     //.frame(width: geometry.size.width, height: geometry.size.height)
                     /*.background(GeometryReader {
                         Color.clear.preference(key: ScrollOffsetKey.self, value: (controller.orientation == .horizontal ? -$0.frame(in: .named("scroll")).origin.x : -$0.frame(in: .named("scroll")).origin.y))

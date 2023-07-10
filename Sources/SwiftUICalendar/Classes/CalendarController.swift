@@ -9,16 +9,23 @@ import SwiftUI
 import Combine
 
 public class CalendarController: ObservableObject {
-    @Published public var interval: Interval
     @Published public var isLocked: Bool
     @Published internal var position: Int = Global.CENTER_PAGE
-    @Published public var viewMode: ViewMode
+    //@Published private var scope: Calendar.Component
+    @Published private var scope: ViewMode
+    @Published public var date: Date
     
     internal let orientation: Orientation
     internal let columnCount = 7
     internal var rowCount: Int {
         get {
-            viewMode == .month ? 6 : 1
+            switch scope {
+            case .month:
+                return 6
+                
+            case .week:
+                return 1
+            }
         }
     }
     internal let max: Int = Global.MAX_PAGE
@@ -26,24 +33,28 @@ public class CalendarController: ObservableObject {
     internal let scrollDetector: CurrentValueSubject<CGFloat, Never>
     internal var cancellables = Set<AnyCancellable>()
     
-    public enum ViewMode: Int {
-        case week = 1
-        case month = 6
-    }
-    
-    public init(_ viewMode: ViewMode = .month, orientation: Orientation = .horizontal, isLocked: Bool = false) {
+    public init(_ scope: ViewMode = .month, orientation: Orientation = .horizontal, isLocked: Bool = false) {
+        let gregorian = Calendar(identifier: .gregorian)
+        let today = Date()
         let detector = CurrentValueSubject<CGFloat, Never>(0)
         
-        self.viewMode = viewMode
-        switch viewMode {
-        case .month:
-            self.interval = MonthInterval()
+        self.scope = scope
+        
+        
+        let majorScopeComponent = gregorian.component(.year, from: today)
+        //let minorScopeComponent = gregorian.component(scope, from: today)
+        
+        switch scope {
         case .week:
-            self.interval = WeekInterval()
+            self.date = gregorian.date(from:DateComponents(year: majorScopeComponent, weekOfYear: gregorian.component(.weekOfYear, from: today)))!
+        case .month:
+            self.date = gregorian.date(from: DateComponents(year: majorScopeComponent, month: gregorian.component(.month, from: today)))!
         }
+        
         self.scrollDetector = detector
         self.orientation = orientation
         self.isLocked = isLocked
+        
         
         detector
             .debounce(for: .seconds(0.2), scheduler: DispatchQueue.main)
@@ -51,7 +62,7 @@ public class CalendarController: ObservableObject {
             .sink { [weak self] value in
                 if let self = self {
                     let step = self.position - self.center
-                    self.interval = self.interval.shifted(by: step)
+                    self.date = offsetedFocus(by: step)
                     self.position = self.center
                     self.objectWillChange.send()
                 }
@@ -59,24 +70,49 @@ public class CalendarController: ObservableObject {
             .store(in: &cancellables)
     }
     
-    public func setViewMode(_ viewMode: ViewMode) {
-        self.viewMode = viewMode
-        
-        switch viewMode {
-        case .month:
-            self.interval = MonthInterval()
-        case .week:
-            self.interval = WeekInterval()
-        }
-    }
-    
-    public func setInterval(_ interval: Interval) {
-        self.interval = interval
+    //TODO: Find a way to turn this function into a {set} method
+    public func setScope(_ scope: ViewMode) {
+        self.scope = scope
         self.position = self.center
         self.objectWillChange.send()
     }
     
-    public func scrollTo(_ interval: Interval, isAnimate: Bool = true) {
+    private var dateFormat: String {
+        get {
+            switch scope {
+            case .week:
+                return "MMM yyyy 'Week #'W"
+            case .month:
+                return "MMM yyyy"
+            }
+        }
+    }
+    public func dateString() -> String {
+        let formatter = DateFormatter()
+        formatter.dateFormat = dateFormat
+        
+        return formatter.string(from: self.date)
+    }
+    
+    
+    public func offsetedFocus(by: Int) -> Date {
+        let gregorian = Calendar(identifier: .gregorian)
+        
+        let componentsToAdd: DateComponents
+        switch scope {
+        case .week:
+            componentsToAdd = DateComponents(weekOfYear: by)
+        case .month:
+            componentsToAdd = DateComponents(month: by)
+        }
+
+        let addedDate = gregorian.date(byAdding: componentsToAdd, to: self.date)!
+        
+        return addedDate
+    }
+    
+    /*
+    public func scrollTo(_ calendarScope: Interval, isAnimate: Bool = true) {
         if isAnimate {
             var diff = self.position - interval.diffInterval(value: self.interval)
             if diff < 0 {
@@ -98,5 +134,5 @@ public class CalendarController: ObservableObject {
             self.interval = interval
             self.objectWillChange.send()
         }
-    }
+    }*/
 }
