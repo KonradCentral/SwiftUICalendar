@@ -10,53 +10,71 @@ import SwiftUI
 import Combine
 
 internal struct InfinitePagerView<Content: View>: View {
-    private let content: (Date, Int) -> Content
+    @State private var internalIndex = 2
+    @Binding var index: Int
+    private let maxIndex = 3, middleIndex = 2
+    @State private var step: Int = 0
+    private let content: (Int) -> Content
     private let flippingAngle: Angle = Angle(degrees: 0)
-    @ObservedObject private var controller: CalendarController
-    //private var _onMoveCenter: ((Int) -> Void)? = nil
+    private var orientation: Orientation
+    @State var isLocked: Bool = false
     
-    init(_ controller: CalendarController, orientation: Orientation, @ViewBuilder content: @escaping (Date, Int) -> Content) {
-        self.controller = controller
+    init(_ index: Binding<Int>, orientation: Orientation, @ViewBuilder content: @escaping (Int) -> Content) {
         self.content = content
+        self.orientation = orientation
+        self._index = index
     }
     
     var body: some View {
         drawTabView {// geometry in
-            ForEach(0..<controller.max, id: \.self) { i in
-                let date = controller.offsetedFocus(by: i - Global.CENTER_PAGE)
-                self.content(date, i)
+            //ForEach(0..<maxIndex, id: \.self) { i in
+                //let date = controller.offsetedFocus(by: i - maxIndex)
+            self.content(index - 1).tag(1)
+            self.content(index + 0).tag(2)
+                .onDisappear {
+                    internalIndex = middleIndex
+                    index += step
+                    step = 0
+                }
+            self.content(index + 1).tag(3)
                     //.frame(width: geometry.size.width, height: geometry.size.height)
                     /*.background(GeometryReader {
                         Color.clear.preference(key: ScrollOffsetKey.self, value: (controller.orientation == .horizontal ? -$0.frame(in: .named("scroll")).origin.x : -$0.frame(in: .named("scroll")).origin.y))
                     })*/
-                    .onPreferenceChange(ScrollOffsetKey.self) { controller.scrollDetector.send($0) }
-                     
-
-            }
+                    /*
+                    .onPreferenceChange(ScrollOffsetKey.self) {
+                        controller.scrollDetector.send($0)
+                    }*/
+            //}
         }
     }
     
     @ViewBuilder
     private func drawTabView<V: View>(@ViewBuilder content: @escaping (/*GeometryProxy*/) -> V) -> some View {
         //GeometryReader { proxy in
-            if controller.orientation == .horizontal {
-                TabView(selection: $controller.position) {
+            if self.orientation == .horizontal {
+                TabView(selection: $internalIndex) {
                     content(/*proxy*/)
                         .contentShape(Rectangle())
-                        .gesture(controller.isLocked ? DragGesture() : nil)
+                        .gesture(isLocked ? DragGesture() : nil)
                 }
                 //.frame(width: proxy.size.width, height: proxy.size.height)
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .coordinateSpace(name: "scroll")
+                .onChange(of: internalIndex) { newValue in
+                    if [1, 3].contains(newValue) {
+                        step = newValue - middleIndex
+                    }
+                }
             }
             else {
-                TabView(selection: $controller.position) {
+                TabView(selection: $internalIndex) {
                     content(/*proxy*/)
                         //.frame(width: proxy.size.width, height: proxy.size.height)
                         .rotationEffect(.degrees(-90))
                         .rotation3DEffect(flippingAngle, axis: (x: 1, y: 0, z: 0))
                         .contentShape(Rectangle())
-                        .gesture(controller.isLocked ? DragGesture() : nil)
+                        .gesture(isLocked ? DragGesture() : nil)
                 }
                 //.frame(width: proxy.size.height, height: proxy.size.width)
                 .rotation3DEffect(flippingAngle, axis: (x: 1, y: 0, z: 0))
@@ -64,23 +82,12 @@ internal struct InfinitePagerView<Content: View>: View {
                 //.offset(x: proxy.size.width)
                 .tabViewStyle(.page(indexDisplayMode: .never))
                 .coordinateSpace(name: "scroll")
+                .onChange(of: internalIndex) { newValue in
+                    if [1, 3].contains(newValue) {
+                        step = newValue - middleIndex
+                    }
+                }
             }
         //}
-    }
-    
-    /* TODO: Remove? */
-    /*
-    func onMoveCenter(callback: ((Int) -> Void)?) -> Self {
-        var ret = self
-        ret._onMoveCenter = callback
-        return ret
-    }*/
-}
-
-fileprivate struct ScrollOffsetKey: PreferenceKey {
-    typealias Value = CGFloat
-    static var defaultValue = CGFloat.zero
-    static func reduce(value: inout Value, nextValue: () -> Value) {
-        value += nextValue()
     }
 }

@@ -17,6 +17,7 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     @ObservedObject private var controller: CalendarController
     private let isHasHeader: Bool
     private let formatter = DateFormatter()
+    @State private var focusOffset: Int = 0
     
     public init(
         _ controller: CalendarController = CalendarController(),
@@ -47,20 +48,22 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     }
     
     public func isCurrentMonth(_ date: Date) -> Bool {
-        Calendar.current.component(.month, from: date) == Calendar.current.component(.month, from: Date())
+        let gregorian = Calendar(identifier: .gregorian)
+        return gregorian.component(.month, from: date) == gregorian.component(.month, from: Date())
     }
     
     public var body: some View {
         GeometryReader { proxy in
-            InfinitePagerView(controller, orientation: controller.orientation) { date, i in
+            InfinitePagerView($focusOffset, orientation: controller.orientation) { index in
+                let offsetedDate = controller.offsetedFocus(by: index)
                 LazyVGrid(columns: gridItem, alignment: .center, spacing: 0) {
                     ForEach(0..<(controller.columnCount * (controller.rowCount + (isHasHeader ? 1 : 0))), id: \.self) { j in
                         GeometryReader { _ in
                             if isHasHeader && j < controller.columnCount {
                                 header(Week.allCases[j])
                             } else {
-                                let date = cellToDate(j - (isHasHeader ? 7 : 0))
-                                self.content(date, isCurrentMonth(date))
+                                let cellDate = offsetDate(by: j - (isHasHeader ? 7 : 0), date: offsetedDate)
+                                self.content(cellDate, isCurrentMonth(cellDate))
                                     .frame(height: calculateCellHeight(j, geometry: proxy))
                             }
                         }
@@ -72,13 +75,13 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
         }
     }
     
-    func cellToDate(_ cellIndex: Int) -> Date {
+    func offsetDate(by: Int, date: Date) -> Date {
         let gregorian = Calendar(identifier: .gregorian)
         
-        let toDate = controller.date
+        let toDate = date
         let weekday = gregorian.component(.weekday, from: toDate) // 1Sun, 2Mon, 3Tue, 4Wed, 5Thu, 6Fri, 7Sat
         var components = DateComponents()
-        components.day = cellIndex + 1 - weekday
+        components.day = by + 1 - weekday
         let addedDate = gregorian.date(byAdding: components, to: toDate)!
         
         return addedDate

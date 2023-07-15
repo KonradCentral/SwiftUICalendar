@@ -10,7 +10,7 @@ import Combine
 
 public class CalendarController: ObservableObject {
     @Published public var isLocked: Bool
-    @Published internal var position: Int = Global.CENTER_PAGE
+    //@Published internal var position: Int = Global.CENTER_PAGE
     //@Published private var scope: Calendar.Component
     @Published private var scope: ViewMode
     @Published public var date: Date
@@ -28,22 +28,17 @@ public class CalendarController: ObservableObject {
             }
         }
     }
-    internal let max: Int = Global.MAX_PAGE
-    internal let center: Int = Global.CENTER_PAGE
-    internal let scrollDetector: CurrentValueSubject<CGFloat, Never>
-    internal var cancellables = Set<AnyCancellable>()
+    //internal let max: Int = Global.MAX_PAGE
+    //internal let center: Int = Global.CENTER_PAGE
+    //internal let scrollDetector: CurrentValueSubject<CGFloat, Never>
+    //internal var cancellables = Set<AnyCancellable>()
     
     public init(_ scope: ViewMode = .month, orientation: Orientation = .horizontal, isLocked: Bool = false) {
         let gregorian = Calendar(identifier: .gregorian)
         let today = Date()
-        let detector = CurrentValueSubject<CGFloat, Never>(0)
         
         self.scope = scope
-        
-        
         let majorScopeComponent = gregorian.component(.year, from: today)
-        //let minorScopeComponent = gregorian.component(scope, from: today)
-        
         switch scope {
         case .week:
             self.date = gregorian.date(from:DateComponents(year: majorScopeComponent, weekOfYear: gregorian.component(.weekOfYear, from: today)))!
@@ -51,15 +46,15 @@ public class CalendarController: ObservableObject {
             self.date = gregorian.date(from: DateComponents(year: majorScopeComponent, month: gregorian.component(.month, from: today)))!
         }
         
-        self.scrollDetector = detector
+        //self.scrollDetector = CurrentValueSubject<CGFloat, Never>(0)
         self.orientation = orientation
         self.isLocked = isLocked
         
         
-        detector
-            .debounce(for: .seconds(0.2), scheduler: DispatchQueue.main)
+        /*self.scrollDetector
+            //.debounce(for: .seconds(0.2), scheduler: DispatchQueue.main)
             .dropFirst()
-            .sink { [weak self] value in
+            .sink { [weak self] _ in
                 if let self = self {
                     let step = self.position - self.center
                     self.date = offsetedFocus(by: step)
@@ -67,13 +62,13 @@ public class CalendarController: ObservableObject {
                     self.objectWillChange.send()
                 }
             }
-            .store(in: &cancellables)
+            .store(in: &cancellables)*/
     }
     
     //TODO: Find a way to turn this function into a {set} method
     public func setScope(_ scope: ViewMode) {
         self.scope = scope
-        self.position = self.center
+        //self.position = self.center
         self.objectWillChange.send()
     }
     
@@ -110,29 +105,4 @@ public class CalendarController: ObservableObject {
         
         return addedDate
     }
-    
-    /*
-    public func scrollTo(_ calendarScope: Interval, isAnimate: Bool = true) {
-        if isAnimate {
-            var diff = self.position - interval.diffInterval(value: self.interval)
-            if diff < 0 {
-                self.interval = interval.shifted(by: self.center)
-                diff = 0
-                // 4 * 12 + 2 50
-            } else if self.max <= diff {
-                self.interval = interval.shifted(by: -self.center + 1)
-                diff = self.max - 1
-            }
-            self.objectWillChange.send()
-            withAnimation { [weak self] in
-                if let self = self {
-                    self.position = diff
-                    self.objectWillChange.send()
-                }
-            }
-        } else {
-            self.interval = interval
-            self.objectWillChange.send()
-        }
-    }*/
 }
