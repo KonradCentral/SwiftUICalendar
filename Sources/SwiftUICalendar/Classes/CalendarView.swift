@@ -17,10 +17,9 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     @ObservedObject private var controller: CalendarController
     private let isHasHeader: Bool
     private let formatter = DateFormatter()
-    @State private var focusOffset: Int = 0
     
     public init(
-        _ controller: CalendarController = CalendarController(),
+        _ controller: CalendarController,
         @ViewBuilder content: @escaping (Date, Bool) -> CalendarCell
     ) where HeaderCell == EmptyView {
         self.controller = controller
@@ -33,7 +32,7 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     }
     
     public init(
-        _ controller: CalendarController = CalendarController(),
+        _ controller: CalendarController,
         headerSize: HeaderSize = .fixHeight(40),
         @ViewBuilder header: @escaping (Week) -> HeaderCell,
         @ViewBuilder content: @escaping (Date, Bool) -> CalendarCell
@@ -47,14 +46,14 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
         formatter.dateFormat = "dd"
     }
     
-    public func isCurrentMonth(_ date: Date) -> Bool {
+    public func isSameMonth(_ dateA: Date, _ dateB: Date) -> Bool {
         let gregorian = Calendar(identifier: .gregorian)
-        return gregorian.component(.month, from: date) == gregorian.component(.month, from: Date())
+        return gregorian.component(.month, from: dateA) == gregorian.component(.month, from: dateB)
     }
     
     public var body: some View {
         GeometryReader { proxy in
-            InfinitePagerView($focusOffset, orientation: controller.orientation) { index in
+            InfinitePagerView($controller.datePeriodsFromNow, orientation: controller.orientation) { index in
                 let offsetedDate = controller.offsetedFocus(by: index)
                 LazyVGrid(columns: gridItem, alignment: .center, spacing: 0) {
                     ForEach(0..<(controller.columnCount * (controller.rowCount + (isHasHeader ? 1 : 0))), id: \.self) { j in
@@ -63,7 +62,7 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
                                 header(Week.allCases[j])
                             } else {
                                 let cellDate = offsetDate(by: j - (isHasHeader ? 7 : 0), date: offsetedDate)
-                                self.content(cellDate, isCurrentMonth(cellDate))
+                                self.content(cellDate, isSameMonth(cellDate, offsetedDate))
                                     .frame(height: calculateCellHeight(j, geometry: proxy))
                             }
                         }
