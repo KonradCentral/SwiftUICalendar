@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 import InfiniteSwipeView
 
+
 public class CalendarController: ObservableObject {
     @Published public var isLocked: Bool
     @Published public var viewMode: ViewMode
