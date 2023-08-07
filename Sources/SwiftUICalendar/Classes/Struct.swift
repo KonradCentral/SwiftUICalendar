@@ -34,11 +34,6 @@ public enum Week: Int, CaseIterable {
     }
 }
 
-public enum Orientation {
-    case horizontal
-    case vertical
-}
-
 public enum HeaderSize {
     case zero
     case ratio

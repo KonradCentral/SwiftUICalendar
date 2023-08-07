@@ -7,10 +7,11 @@
 
 import SwiftUI
 import Combine
+import InfiniteSwipeView
 
 public class CalendarController: ObservableObject {
     @Published public var isLocked: Bool
-    @Published private var scope: ViewMode
+    @Published public var viewMode: ViewMode
     public var date: Date {
         let gregorian = Calendar(identifier: .gregorian)
         let today = Date()
@@ -19,7 +20,7 @@ public class CalendarController: ObservableObject {
         
         
         let majorScopeComponent = gregorian.component(.year, from: today)
-        switch scope {
+        switch viewMode {
         case .week:
             buffer = gregorian.date(from:DateComponents(year: majorScopeComponent, weekOfYear: gregorian.component(.weekOfYear, from: today)))!
             componentsToAdd = DateComponents(weekOfYear: datePeriodsFromNow)
@@ -38,7 +39,7 @@ public class CalendarController: ObservableObject {
     internal let columnCount = 7
     internal var rowCount: Int {
         get {
-            switch scope {
+            switch viewMode {
             case .month:
                 return 6
                 
@@ -49,25 +50,18 @@ public class CalendarController: ObservableObject {
     }
     
     public init(_ scope: ViewMode = .month, orientation: Orientation = .horizontal, isLocked: Bool = false) {
-        self.scope = scope
-        
+        self.viewMode = scope
         self.orientation = orientation
         self.isLocked = isLocked
     }
     
-    //TODO: Find a way to turn this function into a {set} method
-    public func setScope(_ scope: ViewMode) {
-        self.scope = scope
-        //self.objectWillChange.send()
-    }
-    
     private var dateFormat: String {
-            switch scope {
-            case .week:
-                return "MMM yyyy 'Week #'W"
-            case .month:
-                return "MMM yyyy"
-            }
+        switch viewMode {
+        case .week:
+            return "MMM yyyy 'Week #'W"
+        case .month:
+            return "MMM yyyy"
+        }
     }
     
     public func dateString() -> String {
@@ -82,7 +76,7 @@ public class CalendarController: ObservableObject {
         let gregorian = Calendar(identifier: .gregorian)
         
         let componentsToAdd: DateComponents
-        switch scope {
+        switch viewMode {
         case .week:
             componentsToAdd = DateComponents(weekOfYear: by)
         case .month:

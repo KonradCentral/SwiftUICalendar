@@ -7,6 +7,7 @@
 
 import SwiftUI
 import Combine
+import InfiniteSwipeView
 
 public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
@@ -53,9 +54,9 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
     public var body: some View {
         GeometryReader { proxy in
-            InfinitePagerView($controller.datePeriodsFromNow, orientation: controller.orientation) { index in
-                let offsetedDate = controller.offsetedFocus(by: index)
+            InfiniteSwipeView(index: $controller.datePeriodsFromNow, orientation: controller.orientation) { index in
                 LazyVGrid(columns: gridItem, alignment: .center, spacing: 0) {
+                    let offsetedDate = controller.offsetedFocus(by: index)
                     ForEach(0..<(controller.columnCount * (controller.rowCount + (isHasHeader ? 1 : 0))), id: \.self) { j in
                         GeometryReader { _ in
                             if isHasHeader && j < controller.columnCount {
