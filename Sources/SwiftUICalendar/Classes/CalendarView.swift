@@ -9,6 +9,7 @@ import SwiftUI
 import Combine
 import InfiniteSwipeView
 
+@available(macOS 11, *)
 public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     
     private var gridItem: [GridItem] = Array(repeating: .init(.flexible(), spacing: 0), count: 7) // columnCount
@@ -110,6 +111,7 @@ public struct CalendarView<CalendarCell: View, HeaderCell: View>: View {
     }
 }
 
+@available(macOS 11, *)
 struct CalendarView_Previews: PreviewProvider {
     static var previews: some View {
         CalendarView(CalendarController()) { date, isFocusMonth in

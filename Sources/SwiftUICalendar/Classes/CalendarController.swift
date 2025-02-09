@@ -10,6 +10,7 @@ import Combine
 import InfiniteSwipeView
 
 
+@available(macOS 10.15, *)
 public class CalendarController: ObservableObject {
     @Published public var viewMode: ViewMode
     @Published public var year: Int
